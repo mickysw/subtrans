@@ -1,0 +1,37 @@
+{
+  "_설명": "AI 번역이 가장 자주 틀리는 게 사람 이름·팀명입니다. 여기 적어두면 고정됩니다. 영상마다 등장인물을 추가하세요.",
+  "인물": {
+    "Son Heung-min": "손흥민",
+    "Sonny": "쏘니",
+    "Ochocinco": "오초신코",
+    "Chad Johnson": "채드 존슨",
+    "Harry Kane": "해리 케인",
+    "Dele Alli": "델리 알리",
+    "Dele": "델리",
+    "Pochettino": "포체티노",
+    "Mauricio Pochettino": "마우리시오 포체티노",
+    "Lee Kang-in": "이강인"
+  },
+  "팀·리그": {
+    "Tottenham": "토트넘",
+    "Spurs": "토트넘",
+    "LAFC": "LAFC",
+    "MLS": "MLS",
+    "Ajax": "아약스",
+    "Premier League": "프리미어리그",
+    "Champions League": "챔피언스리그",
+    "Atletico Madrid": "아틀레티코 마드리드"
+  },
+  "축구용어": {
+    "striker": "스트라이커",
+    "winger": "윙어",
+    "midfielder": "미드필더",
+    "counter attack": "역습",
+    "assist": "어시스트",
+    "clean sheet": "무실점",
+    "two-footed": "양발잡이",
+    "finisher": "피니셔",
+    "pace": "스피드",
+    "gaffer": "감독"
+  }
+}

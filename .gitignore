@@ -1,0 +1,24 @@
+# 비밀 — 절대 올리지 않는다
+.env
+
+# 작업 산출물 (영상·자막·중간 파일). 저작물이 섞이므로 반드시 제외
+work/
+*.mp4
+*.mkv
+*.webm
+*.wav
+*.srt
+*.ass
+
+# 파이썬 환경
+.venv/
+__pycache__/
+*.pyc
+
+# 편집기
+.vscode/
+.idea/
+.DS_Store
+
+# 작업 도구가 남긴 내부 기록
+.omc/

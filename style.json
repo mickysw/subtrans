@@ -1,0 +1,31 @@
+{
+  "_설명": "자막 모양과 액자 배치는 여기 한 곳에서만 고칩니다. 여러 군데 흩어지면 나중에 못 찾습니다.",
+  "frame": {
+    "canvas_width": 2560,
+    "canvas_height": 1440,
+    "video_width_ratio": 0.85,
+    "video_top_ratio": 0.35,
+    "background_color": "#141414",
+    "background_image": null
+  },
+  "subtitle": {
+    "font": "Malgun Gothic",
+    "size": 64,
+    "bold": true,
+    "color": "#FFFFFF",
+    "outline_color": "#000000",
+    "outline": 4.0,
+    "shadow": 1.5,
+    "margin_bottom": 45,
+    "margin_lr": 260,
+    "line_spacing": 0
+  },
+  "encode": {
+    "crf": 17,
+    "preset": "medium",
+    "audio_bitrate": "192k"
+  },
+  "quality_gate": {
+    "vmaf_min": 95.0
+  }
+}

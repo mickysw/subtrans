@@ -1,0 +1,31 @@
+{
+  "asr": {
+    "model": "large-v3-turbo",
+    "device": "cpu",
+    "compute_type": "int8",
+    "cpu_threads": 0,
+    "language": "en",
+    "beam_size": 5,
+    "vad_filter": true
+  },
+  "fetch": {
+    "min_height": 1080,
+    "format": "bv*[height>=1080]+ba[ext=m4a]/bv*[height>=1080]+ba/b[height>=1080]/b",
+    "container": "mkv",
+    "audio_note": "m4a(AAC) 우선 — 최종 mp4에 -c:a copy 로 무손실 복사하기 위함"
+  },
+  "segment": {
+    "gap_threshold": 0.4,
+    "min_duration": 1.0,
+    "max_duration": 7.0,
+    "max_chars_per_line": 16,
+    "max_lines": 2
+  },
+  "translate": {
+    "provider": "gemini",
+    "gemini_model": "gemini-3.8-flash",
+    "claude_model": "opus",
+    "fallback_to_claude": true,
+    "_설명": "gemini = 무료·빠름(호출당 입력 약 2,400 토큰). claude = Claude Code 구독 사용(호출당 약 44,000 토큰). 키는 환경변수 GEMINI_API_KEY 또는 이 폴더의 .env 에서 읽습니다. gemini가 막히면 claude로 자동 전환됩니다."
+  }
+}
