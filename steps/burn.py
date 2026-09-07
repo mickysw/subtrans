@@ -136,7 +136,9 @@ def measure_vmaf(out_mp4: Path, src: Path, lay: dict, src_w: int, src_h: int,
             wins.append((t, min(t + VMAF_WINDOW_SEC, duration)))
     if not wins:
         wins = [(0.0, min(VMAF_WINDOW_SEC, duration))]
-    sel = "+".join(f"between(t\,{a:.2f}\,{b:.2f})" for a, b in wins)
+    # ffmpeg 필터 안에서는 쉼표를 이스케이프해야 인자 구분자로 오해받지 않는다.
+    # 파이썬에게는 raw 문자열로 줘야 \, 를 그대로 넘긴다.
+    sel = "+".join(rf"between(t\,{a:.2f}\,{b:.2f})" for a, b in wins)
 
     vf = (f"[0:v]crop={lay['vid_w']}:{lay['vid_h']}:{lay['pad_x']}:{lay['pad_y']},"
           f"scale={src_w}:{src_h}:flags=lanczos,"
@@ -157,14 +159,32 @@ def measure_vmaf(out_mp4: Path, src: Path, lay: dict, src_w: int, src_h: int,
 
 
 def report_vmaf(score: float | None, style: dict, enc: dict) -> None:
+    """점수를 등급으로 풀어서 알려준다.
+
+    ⚠️ 이 점수는 '원본 대비'다. 우리는 이미 압축된 영상을 다시 인코딩하므로
+    인코더가 원본의 압축 잡음을 다듬기만 해도 점수가 크게 깎인다 — 눈에는 안 보인다.
+    실제로 81점이 나온 결과물을 원본과 1:1 픽셀로 비교했을 때 구분되지 않았다.
+    그래서 CRF를 낮춰 점수를 쫓는 것은 의미가 없다(17→11로 내려도 0.37점).
+    """
     gate = style["quality_gate"]["vmaf_min"]
     if score is None:
         print("[burn] 화질 점수를 얻지 못했습니다.")
+        return
+    if score >= 95:
+        note = "원본과 구분 불가"
+    elif score >= 85:
+        note = "정상 범위 (재인코딩에서 흔한 값)"
     elif score >= gate:
-        print(f"[burn] ✓ VMAF {score:.2f} — {gate} 이상이라 사람 눈으로 구분 불가입니다.")
+        note = "낮은 편이지만 눈으로는 잘 드러나지 않는 구간"
     else:
-        print(f"[burn] ⚠️ VMAF {score:.2f} — 기준 {gate}에 못 미칩니다. "
-              f"style.json 의 crf 를 낮춰(예: {enc['crf']-3}) 다시 구우세요.")
+        note = "설정 확인 필요"
+    mark = "✓" if score >= gate else "⚠️"
+    print(f"[burn] {mark} VMAF {score:.2f} — {note}")
+    if score < gate:
+        print("       CRF를 낮춰도 거의 오르지 않습니다(실측 0.37점). 대신 확인할 것:")
+        print("       · 결과물 해상도가 의도한 캔버스와 같은지 (축소가 끼어들지 않았는지)")
+        print("       · 원본이 1080p 이상인지")
+        print("       · 프레임레이트가 원본과 같은지")
 
 
 def main(workdir: Path, srt_name: str | None = None, vmaf: bool = True,

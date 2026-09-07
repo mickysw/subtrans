@@ -114,10 +114,43 @@ decoded from start:   97.4    <- same segment, same file
 ```
 
 The ruler was broken. Replaced seeking with a `select` filter and reverted CRF to 17.
-**Final measured score: 97.12.**
+**Measured 97.12 at that point** (this number gets overturned below).
 
 > Takeaway: when a lever produces no response, suspect the **ruler**, not the lever.
 > Otherwise this would have shipped a 46% larger file and a "quality failed" conclusion.
+
+### Then the threshold turned out to be wrong too (round 2)
+
+That 97.12 came from a 5-minute test clip. Running the full 26-minute video produced
+**81.5** — same settings, same video.
+
+The difference was the source. Clip mode had fetched an h264 stream; the full download
+fetched VP9. **A better source is harder to reproduce.**
+
+Split the causes again:
+
+| Measured | VMAF |
+|---|---|
+| CRF 17 / 14 / 11 | 85.9 / 86.1 / 86.3 (3x bitrate buys +0.37) |
+| Upscale/downscale round trip, no compression | 98.1 |
+| Compression only, against a losslessly framed reference | 88.7 (5.5 Mbps) / 88.9 (8.6 Mbps) |
+
+Even 8.6 Mbps stalls at 89. The numbers had stopped explaining anything.
+
+**So I looked.** Same timestamp from source and output, cropped 1:1 at pixel scale.
+Shirt lettering, microphone label, cable detail — **indistinguishable.**
+
+The cause is inherent to second-generation encoding. Re-encoding already-compressed video
+makes the encoder smooth the source's own compression noise. To a human that is neutral
+or an improvement; **VMAF scores it as damage.** VMAF 95 is a threshold for encoding a
+pristine master, not for re-encoding.
+
+So the gate changed purpose: from "is the quality good" to **"is the configuration broken."**
+Threshold 80, and the advice to lower CRF was removed — measured twice as ineffective, so
+it was simply wrong advice. It now tells you to check resolution and frame rate instead.
+
+> Takeaway 2: fixing the ruler is not enough. **What the ruler was designed to measure**
+> has to match too. And when numbers stop explaining, go look at the pixels.
 
 ### Cutting translation cost 18x
 
