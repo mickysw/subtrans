@@ -25,11 +25,15 @@ def make_preview(video: Path, out: Path) -> Path:
     if out.exists():
         print(f"[review] 미리보기 영상 재사용: {out.name}")
         return out
-    print("[review] 검수용 미리보기 영상을 만듭니다 (저화질, 탐색용)...")
+    print("[review] 검수용 미리보기 영상을 만듭니다 (탐색이 빠른 중간 화질)...")
+    # 원본을 그대로 쓰지 않는 이유: 브라우저가 mkv 안의 VP9 을 잘 못 열고, 큰 파일은
+    # 탐색이 느려 검수가 불편하다. 다만 자막과 얼굴을 판단할 만큼은 되어야 한다 —
+    # 640x360 으로 만들었더니 너무 뭉개져서 960x540 으로 올렸다.
+    # 최종 결과물은 여기가 아니라 원본에서 만든다.
     cp = subprocess.run(
         ["ffmpeg", "-y", "-v", "error", "-i", str(video),
-         "-vf", "scale=640:-2", "-c:v", "libx264", "-preset", "veryfast", "-crf", "30",
-         "-c:a", "aac", "-b:a", "64k", "-movflags", "+faststart", str(out)],
+         "-vf", "scale=960:-2", "-c:v", "libx264", "-preset", "veryfast", "-crf", "25",
+         "-c:a", "aac", "-b:a", "96k", "-movflags", "+faststart", str(out)],
         capture_output=True, text=True, encoding="utf-8", errors="replace")
     if cp.returncode != 0:
         raise RuntimeError(f"미리보기 생성 실패: {cp.stderr[-500:]}")
