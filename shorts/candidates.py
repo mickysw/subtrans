@@ -80,9 +80,13 @@ def validate(items: list[dict], cues: list[dict]) -> tuple[list[dict], list[str]
     return ok, dropped
 
 
-def drop_overlaps(cands: list[dict]) -> tuple[list[dict], list[str]]:
-    """점수 높은 것부터 담되, 이미 담은 것과 많이 겹치면 버린다."""
-    kept: list[dict] = []
+def drop_overlaps(cands: list[dict], seed: list[dict] | None = None) -> tuple[list[dict], list[str]]:
+    """점수 높은 것부터 담되, 이미 담은 것과 많이 겹치면 버린다.
+
+    seed: 이미 확정된 후보들. 새로 뽑을 때 이것들과도 겹치면 안 된다.
+    """
+    kept: list[dict] = list(seed or [])
+    seed_n = len(kept)
     dropped: list[str] = []
     for c in sorted(cands, key=lambda x: -x["score"]):
         clash = None
@@ -99,16 +103,26 @@ def drop_overlaps(cands: list[dict]) -> tuple[list[dict], list[str]]:
                            f"→ \"{clash['title'][:18]}\"과 겹침")
         else:
             kept.append(c)
-    return kept, dropped
+    return kept[seed_n:], dropped      # 새로 담은 것만 돌려준다
 
 
-def main(workdir: Path, force: bool = False) -> dict:
+def main(workdir: Path, force: bool = False, add: int = 0) -> dict:
+    """add > 0 이면 기존 후보는 그대로 두고 겹치지 않는 것만 더 뽑는다.
+
+    이미 사람이 검수한 후보를 다시 뽑으면 바뀌어 버린다. 더 필요할 때는
+    새로 뽑지 말고 덧붙인다.
+    """
     out_dir = workdir / "shorts"
     out_dir.mkdir(exist_ok=True)
     out = out_dir / "candidates.json"
-    if out.exists() and not force:
-        print(f"[candidates] 이미 있는 결과를 씁니다: {out.name}")
-        return json.loads(out.read_text(encoding="utf-8"))
+    existing: list[dict] = []
+    if out.exists():
+        if add > 0:
+            existing = json.loads(out.read_text(encoding="utf-8"))["candidates"]
+            print(f"[candidates] 기존 {len(existing)}개는 그대로 두고 {add}개를 더 찾습니다.")
+        elif not force:
+            print(f"[candidates] 이미 있는 결과를 씁니다: {out.name}")
+            return json.loads(out.read_text(encoding="utf-8"))
 
     cues = json.loads((workdir / "cues.json").read_text(encoding="utf-8"))
     meta = json.loads((workdir / "fetch.json").read_text(encoding="utf-8"))
@@ -116,17 +130,25 @@ def main(workdir: Path, force: bool = False) -> dict:
     tpl = (ROOT / "prompts" / "shorts_candidates.md").read_text(encoding="utf-8")
 
     duration = float(meta.get("duration") or cues[-1]["end"])
-    target = target_count(duration)
+    target = add if add > 0 else target_count(duration)
     ask = target * 2
 
     print(f"[candidates] 영상 {duration/60:.1f}분 · 자막 {len(cues)}장 "
           f"→ 목표 {target}개 (넉넉히 {ask}개 요청)")
 
+    taken = ""
+    if existing:
+        rows = "\n".join(
+            f"- [{c['start_cue']}]~[{c['end_cue']}] \"{c['title']}\"" for c in existing)
+        taken = ("## 이미 고른 구간 — 여기와 겹치지 않는 곳에서 찾으세요\n\n"
+                 + rows + "\n\n이 구간들은 이미 쓰기로 했습니다. 다른 곳을 보세요.")
+
     send = Translator(cfg.get("translate", {"provider": "gemini",
                                             "gemini_model": "gemini-3.8-flash",
                                             "claude_model": "opus"}))
     prompt = (tpl.replace("{TRANSCRIPT}", build_transcript(cues))
-                 .replace("{COUNT}", str(ask)))
+                 .replace("{COUNT}", str(ask))
+                 .replace("{TAKEN}", taken))
 
     items = None
     for attempt in (1, 2):
@@ -139,16 +161,19 @@ def main(workdir: Path, force: bool = False) -> dict:
         raise SystemExit("[candidates] LLM이 쓸 수 있는 답을 주지 않았습니다.")
 
     ok, bad = validate(items, cues)
-    kept, overlapped = drop_overlaps(ok)
-    final = kept[:target]
+    kept, overlapped = drop_overlaps(ok, seed=existing)
+    fresh = kept[:target]
+    final = existing + fresh          # 기존 것이 앞이라 n 번호가 유지된다
 
     print(f"[candidates] 받은 {len(items)}개 → 검증 통과 {len(ok)} → "
-          f"겹침 제거 {len(kept)} → 최종 {len(final)}")
+          f"겹침 제거 {len(kept)} → 새로 담은 것 {len(fresh)}개 "
+          f"(전체 {len(final)}개)")
     for msg in (bad + overlapped)[:8]:
         print(f"      버림: {msg}")
 
-    if len(final) < MIN_OUT:
-        print(f"[candidates] ⚠️ {len(final)}개뿐입니다. 프롬프트나 영상 성격을 확인하세요.")
+    if len(fresh) < target:
+        print(f"[candidates] ⚠️ {target}개를 원했지만 {len(fresh)}개만 남았습니다. "
+              "남은 구간에 쓸 만한 게 그만큼인 듯합니다.")
 
     for i, c in enumerate(final, 1):
         c["n"] = i
@@ -162,19 +187,23 @@ def main(workdir: Path, force: bool = False) -> dict:
     out.write_text(json.dumps(result, ensure_ascii=False, indent=1), encoding="utf-8")
 
     print()
-    for c in final:
-        hook = cues[c["hook_cue"] - 1]["text"]
+    show = fresh if existing else final
+    for c in show:
         print(f"  [{c['n']}] {mmss(c['start'])}~{mmss(c['end'])} ({c['duration']:.0f}초) "
-              f"점수 {c['score']:.2f}")
-        print(f"      제목: {c['title']}")
-        print(f"      후킹: {hook[:70]}")
-        print(f"      이유: {c['why'][:70]}")
+              f"점수 {c['score']:.2f}  {c['title']}")
+        print(f"      {c['why'][:74]}")
     print(f"\n[candidates] 완료 → {out}")
     return result
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("사용법: python shorts/candidates.py <work폴더명> [--force]")
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    if not args:
+        print("사용법: python shorts/candidates.py <work폴더명> [--force] [--add N]")
+        print("  --add N : 기존 후보는 그대로 두고 겹치지 않는 것만 N개 더 찾는다")
         raise SystemExit(1)
-    main(ROOT / "work" / sys.argv[1], force="--force" in sys.argv)
+    add = 0
+    if "--add" in sys.argv:
+        i = sys.argv.index("--add")
+        add = int(sys.argv[i + 1]) if i + 1 < len(sys.argv) else 2
+    main(ROOT / "work" / args[0], force="--force" in sys.argv, add=add)
