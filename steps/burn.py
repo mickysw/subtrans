@@ -104,6 +104,21 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 
 # ─────────────────────────────── 실행 ───────────────────────────────
 
+def safe_filename(title: str, limit: int = 90) -> str:
+    """영상 제목을 파일 이름으로 쓸 수 있게 다듬는다.
+
+    파일 이름이 전부 out.mp4 이면 영상이 쌓였을 때 어느 게 어느 건지
+    이름만으로 구분이 안 되고, 윈도우 검색으로도 못 찾는다.
+    """
+    bad = set('<>:"/|?*' + chr(92))
+    t = "".join(" " if c in bad else c for c in title)
+    t = "".join(c for c in t if ord(c) >= 32)
+    t = " ".join(t.split())[:limit].strip()
+    while t.endswith("."):
+        t = t[:-1].strip()
+    return t or "out"
+
+
 def run_ffmpeg(cmd: list[str], cwd: Path, label: str) -> str:
     cp = subprocess.run(cmd, cwd=str(cwd), capture_output=True,
                         text=True, encoding="utf-8", errors="replace")
@@ -222,7 +237,12 @@ def main(workdir: Path, srt_name: str | None = None, vmaf: bool = True,
           f"pad={lay['canvas_w']}:{lay['canvas_h']}:{lay['pad_x']}:{lay['pad_y']}:color=0x{bg},"
           f"ass=subs.ass")
 
-    out = workdir / "out.mp4"
+    # 결과물 이름은 영상 제목으로 짓는다 (out.mp4 로 통일하면 나중에 못 찾는다)
+    out = workdir / f"{safe_filename(meta.get('title') or workdir.name)}.mp4"
+    legacy = workdir / "out.mp4"
+    if vmaf_only and not out.exists() and legacy.exists():
+        out = legacy          # 예전 방식으로 구운 파일도 잴 수 있게
+
     if vmaf_only and out.exists():
         print("[burn] 이미 구운 영상으로 화질만 다시 잽니다.")
         score = measure_vmaf(out, src, lay, meta["width"], meta["height"],

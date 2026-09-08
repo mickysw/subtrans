@@ -9,6 +9,6 @@ if "%~1"=="" (
   pause
   exit /b 1
 )
-.venv\Scripts\python.exe run.py %*
+call "%~dp0py.cmd" run.py %*
 echo.
 pause

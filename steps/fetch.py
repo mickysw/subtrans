@@ -7,6 +7,7 @@ mp4는 마지막 굽기(⑦)에서 만든다.
 from __future__ import annotations
 
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -21,7 +22,15 @@ YTDLP = ROOT / ".venv" / "Scripts" / "yt-dlp.exe"
 
 
 def run(cmd: list[str], **kw) -> subprocess.CompletedProcess:
-    return subprocess.run(cmd, text=True, encoding="utf-8", errors="replace", **kw)
+    """자식 프로세스 출력을 UTF-8로 강제한다.
+
+    윈도우에서 yt-dlp는 콘솔 기본 인코딩(cp949 등)으로 찍는데 그걸 UTF-8로 읽으면
+    제목의 특수 문자가 깨진다. 실제로 영상 제목의 작은따옴표가 깨져 파일 이름에
+    U+FFFD 가 박히는 사고가 났다. PYTHONIOENCODING 으로 출력 쪽을 맞춘다.
+    """
+    env = {**os.environ, "PYTHONIOENCODING": "utf-8"}
+    return subprocess.run(cmd, text=True, encoding="utf-8", errors="replace",
+                          env=env, **kw)
 
 
 def probe(path: Path) -> dict:
@@ -55,6 +64,18 @@ def video_id(source: str) -> str:
         return m.group(1)
     stem = re.sub(r"[^A-Za-z0-9_-]+", "_", Path(source).stem)[:40]
     return stem or "local"
+
+
+def video_title(source: str, workdir: Path) -> str:
+    """받는 시점의 제목을 잡는다. 유튜브는 제목을 수시로 바꾸므로
+    나중에 다시 물어보면 다른 답이 온다 — 실제로 이 영상이 그랬다."""
+    if Path(source).exists():
+        return Path(source).stem
+    cp = run([str(YTDLP), source, "--print", "%(title)s",
+              "--skip-download", "--no-warnings", "--no-playlist"],
+             capture_output=True)
+    title = (cp.stdout or "").strip().splitlines()
+    return title[0] if title and title[0] else workdir.name
 
 
 def download(url: str, workdir: Path, cfg: dict, clip: str | None = None) -> Path:
@@ -149,7 +170,17 @@ def main(source: str, clip: str | None = None, force: bool = False) -> dict:
         print("[fetch] 오디오 추출 중...")
         audio = extract_audio(video, workdir)
 
-    meta = {"source": source, "video": str(video), "audio": str(audio), **info}
+    prev = {}
+    if (workdir / "fetch.json").exists():
+        try:
+            prev = json.loads((workdir / "fetch.json").read_text(encoding="utf-8"))
+        except Exception:
+            prev = {}
+    title = prev.get("title") or video_title(source, workdir)
+    print(f"[fetch] 제목: {title}")
+
+    meta = {"source": source, "title": title,
+            "video": str(video), "audio": str(audio), **info}
     (workdir / "fetch.json").write_text(
         json.dumps(meta, ensure_ascii=False, indent=2), encoding="utf-8")
     print(f"[fetch] 완료 → {workdir}")
