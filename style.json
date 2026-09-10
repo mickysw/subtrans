@@ -28,5 +28,49 @@
   "quality_gate": {
     "vmaf_min": 80.0,
     "_설명": "이 값은 '화질이 좋다'의 기준이 아니라 '설정이 망가졌다'를 잡는 기준이다. 우리는 이미 압축된 영상을 다시 인코딩하므로, 인코더가 원본의 압축 잡음을 다듬는 것만으로도 VMAF가 크게 깎인다(눈에는 안 보인다). 실측: 정지 화면 86~97, 움직임 많은 구간 82~85, 압축 없이 확대·축소만 해도 98. CRF를 17→11로 내려도 0.37점만 오르므로 점수가 낮다고 CRF를 쫓지 말 것. 80 아래로 떨어지면 해상도가 줄었거나 설정이 틀어진 것이니 그때 원인을 찾는다."
+  },
+  "shorts": {
+    "_설명": "세로 쇼츠 배치. 영상은 원본에서 1080x1080을 잘라내 확대·축소가 없다 — 원본이 1920x1080이고 쇼츠 폭이 1080이라 세로를 통째로 쓸 수 있기 때문. 이 숫자를 바꾸면 리샘플링이 생겨 화질이 깎인다.",
+    "canvas_w": 1080,
+    "canvas_h": 1920,
+    "title_band": 430,
+    "video_size": 1080,
+    "background": "#141414",
+    "title": {
+      "font": "Malgun Gothic",
+      "size": 76,
+      "color": "#FFFFFF",
+      "outline_color": "#000000",
+      "outline": 5.0,
+      "shadow": 1.5,
+      "margin_top": 120,
+      "margin_lr": 60,
+      "max_chars": 12
+    },
+    "sub": {
+      "font": "Malgun Gothic",
+      "size": 68,
+      "color": "#FFFFFF",
+      "outline_color": "#000000",
+      "outline": 4.5,
+      "shadow": 1.5,
+      "margin_bottom": 118,
+      "margin_lr": 50
+    },
+    "brand": {
+      "font": "Malgun Gothic",
+      "size": 30,
+      "color": "#B8BCC8",
+      "outline_color": "#000000",
+      "outline": 2.0,
+      "margin_bottom": 42,
+      "margin_lr": 40,
+      "text": ""
+    },
+    "encode": {
+      "crf": 18,
+      "preset": "medium",
+      "raw_crf": 10
+    }
   }
 }
