@@ -24,14 +24,16 @@ sys.path.insert(0, str(ROOT / "steps"))
 from srtlib import read_srt          # noqa: E402
 from burn import safe_filename, ass_color, ass_time  # noqa: E402
 from translate import wrap_ko        # noqa: E402
+from emphasis import valid_emphasis   # noqa: E402
 
 DEFAULTS = {
     "canvas_w": 1080, "canvas_h": 1920,
     "title_band": 430, "video_size": 1080,
     "background": "#141414",
-    "title": {"font": "Malgun Gothic", "size": 76, "color": "#FFFFFF",
+    "title": {"font": "Malgun Gothic", "size": 88, "color": "#FFFFFF",
               "outline_color": "#000000", "outline": 5.0, "shadow": 1.5,
-              "margin_top": 120, "margin_lr": 60, "max_chars": 12},
+              "margin_top": 100, "margin_lr": 56, "max_chars": 11,
+              "accent": "#FFD54A"},
     "sub": {"font": "Malgun Gothic", "size": 58, "color": "#FFFFFF",
             "outline_color": "#000000", "outline": 4.5, "shadow": 1.5,
             "margin_bottom": 125, "margin_lr": 50},
@@ -105,7 +107,29 @@ def concat_spans(src: Path, spans: list[dict], out: Path, workdir: Path,
 
 # ── 4-b. 세로 화면 + 자막 ────────────────────────────────────────
 
-def build_ass(title: str, lines: list[dict], s: dict, brand: str) -> str:
+def title_text(title: str, t: dict, canvas_w: int,
+               emphasis: list[str] | None = None) -> str:
+    """줄바꿈 뒤에만 색 태그를 넣어 태그 때문에 줄 길이가 틀어지지 않게 한다."""
+    clean = title.replace("{", "").replace("}", "").replace("\\", "")
+    wrapped = wrap_ko(clean, t["max_chars"])
+    longest = max(len(line) for line in wrapped.split("\n"))
+    width = canvas_w - 2 * t["margin_lr"]
+    size = min(t["size"], width // max(longest, 1))
+    prefix = f"{{\\fs{size}}}" if size < t["size"] else ""
+    words = set(valid_emphasis(clean, emphasis))
+    accent = ass_color(t.get("accent", "#FFD54A")) + "&"
+    base = ass_color(t["color"]) + "&"
+    parts = []
+    for line in wrapped.split("\n"):
+        tokens = line.split(" ")
+        parts.append(" ".join(
+            f"{{\\1c{accent}}}{word}{{\\1c{base}}}" if word in words else word
+            for word in tokens))
+    return prefix + r"\N".join(parts)
+
+
+def build_ass(title: str, lines: list[dict], s: dict, brand: str,
+              emphasis: list[str] | None = None) -> str:
     """제목(고정) · 대사 자막 · 채널명(고정) 세 가지를 한 파일에."""
     t, sub, br = s["title"], s["sub"], s["brand"]
     end = max((l["out_e"] for l in lines), default=1.0) + 1.0
@@ -135,7 +159,7 @@ Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour,
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
 """
     ev = [f"Dialogue: 0,{ass_time(0)},{ass_time(end)},Title,,0,0,0,,"
-          + wrap_ko(title, t["max_chars"]).replace("\n", r"\N")]
+          + title_text(title, t, s["canvas_w"], emphasis)]
     if brand:
         ev.append(f"Dialogue: 0,{ass_time(0)},{ass_time(end)},Brand,,0,0,0,,{brand}")
     for l in lines:
@@ -184,7 +208,8 @@ def description(edl: dict, hook_ko: str, meta: dict) -> str:
 
 # ── 실행 ─────────────────────────────────────────────────────────
 
-def main(workdir: Path, only: list[int] | None = None, force: bool = False) -> list[Path]:
+def main(workdir: Path, only: list[int] | None = None, force: bool = False,
+         reuse_raw: bool = False) -> list[Path]:
     sd = workdir / "shorts"
     style = json.loads((ROOT / "style.json").read_text(encoding="utf-8"))
     s = cfg_shorts(style)
@@ -203,6 +228,10 @@ def main(workdir: Path, only: list[int] | None = None, force: bool = False) -> l
         print(f"[render] 고른 것만 굽습니다: {only}")
 
     edls = sorted(sd.glob("edl_*.json"), key=lambda p: int(p.stem.split("_")[1]))
+    cand_file = sd / "candidates.json"
+    candidates = (json.loads(cand_file.read_text(encoding="utf-8"))["candidates"]
+                  if cand_file.exists() else [])
+    accents = {c["n"]: c for c in candidates}
     made: list[Path] = []
 
     for f in edls:
@@ -221,7 +250,7 @@ def main(workdir: Path, only: list[int] | None = None, force: bool = False) -> l
         print(f"[render] {n}번 \"{e['title']}\" ({e['duration']:.0f}초, 조각 {len(e['spans'])}개)")
 
         raw = sd / f"clip_{n}_raw.mp4"
-        if not raw.exists() or force:
+        if not raw.exists() or (force and not reuse_raw):
             print("         조각 이어 붙이는 중...")
             concat_spans(src, e["spans"], raw, sd, s["encode"]["raw_crf"])
         ri = probe(raw)
@@ -236,7 +265,9 @@ def main(workdir: Path, only: list[int] | None = None, force: bool = False) -> l
 
         ass_name = f"shorts_{n}.ass"
         (sd / ass_name).write_text(
-            build_ass(e["title"], lines, s, s["brand"].get("text", "")),
+            build_ass(e["title"], lines, s, s["brand"].get("text", ""),
+                      accents[n].get("emphasis")
+                      if n in accents and accents[n]["title"] == e["title"] else None),
             encoding="utf-8")
 
         print("         세로 화면으로 굽는 중...")
@@ -260,7 +291,8 @@ def main(workdir: Path, only: list[int] | None = None, force: bool = False) -> l
 if __name__ == "__main__":
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     if not args:
-        print("사용법: python shorts/render.py <work폴더명> [번호...] [--force]")
+        print("사용법: python shorts/render.py <work폴더명> [번호...] [--force] [--reuse-raw]")
         raise SystemExit(1)
     nums = [int(a) for a in args[1:]] or None
-    main(ROOT / "work" / args[0], only=nums, force="--force" in sys.argv)
+    main(ROOT / "work" / args[0], only=nums, force="--force" in sys.argv,
+         reuse_raw="--reuse-raw" in sys.argv)

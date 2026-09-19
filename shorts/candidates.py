@@ -18,6 +18,7 @@ sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "steps"))
 from translate import Translator, parse_json_array  # noqa: E402
+from emphasis import valid_emphasis  # noqa: E402
 
 MIN_SEC, MAX_SEC = 35.0, 85.0     # 후보 구간 길이 (편집 후 30~60초가 되게 넉넉히)
 OVERLAP_LIMIT = 0.5               # 이 이상 겹치면 점수 낮은 쪽을 버린다
@@ -74,6 +75,7 @@ def validate(items: list[dict], cues: list[dict]) -> tuple[list[dict], list[str]
             "start_cue": s, "end_cue": e, "hook_cue": h,
             "title": title, "why": str(it.get("why", "")).strip(),
             "score": score,
+            "emphasis": valid_emphasis(title, it.get("emphasis")),
             "start": round(start, 2), "end": round(end, 2), "duration": round(dur, 1),
         })
 

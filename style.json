@@ -38,14 +38,15 @@
     "background": "#141414",
     "title": {
       "font": "Malgun Gothic",
-      "size": 76,
+      "size": 88,
       "color": "#FFFFFF",
       "outline_color": "#000000",
       "outline": 5.0,
       "shadow": 1.5,
-      "margin_top": 120,
-      "margin_lr": 60,
-      "max_chars": 12
+      "margin_top": 100,
+      "margin_lr": 56,
+      "max_chars": 11,
+      "accent": "#FFD54A"
     },
     "sub": {
       "font": "Malgun Gothic",
@@ -54,7 +55,7 @@
       "outline_color": "#000000",
       "outline": 4.5,
       "shadow": 1.5,
-      "margin_bottom": 118,
+      "margin_bottom": 150,
       "margin_lr": 50
     },
     "brand": {
